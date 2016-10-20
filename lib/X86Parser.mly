@@ -31,6 +31,7 @@ open X86
 %token  I_LOCK  I_XCHG   I_LFENCE  I_SFENCE  I_MFENCE
 %token  I_READ I_SETNB I_JE I_JNE
 %token  I_CMPXCHG
+%token  I_XBEGIN I_XABORT I_XEND
 
 %type <int list * (X86Base.pseudo) list list * MiscParser.gpu_data option> main 
 %start  main
@@ -110,6 +111,12 @@ instr:
   | I_MFENCE
       { I_MFENCE}
   | I_SETNB effaddr {I_SETNB $2 }
+  | I_XBEGIN NAME
+    { I_XBEGIN $2 }
+  | I_XABORT operand
+    { I_XABORT $2 }
+  | I_XEND
+    { I_XEND }
 
 effaddr:
   | rm32  {Effaddr_rm32 $1}

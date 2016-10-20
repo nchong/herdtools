@@ -60,6 +60,9 @@ rule token = parse
 | "mfence"|"MFENCE"   { I_MFENCE }
 | "read"|"READ"       { I_READ }
 | "setnb"|"SETNB"       { I_SETNB }
+| "xbegin"|"XBEGIN" { I_XBEGIN }
+| "xabort"|"XABORT" { I_XABORT }
+| "xend"|"XEND" { I_XEND }
 | name as x
   { match X86.parse_reg x with
   | Some r -> ARCH_REG r

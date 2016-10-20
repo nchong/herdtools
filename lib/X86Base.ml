@@ -147,6 +147,10 @@ type instruction =
   | I_MOVQ of effaddr * operand
 (* 64 bits mem-mem "string" move (operands in esi and edi) *)
   | I_MOVSD
+(* TSX RTM (restricted transactional memory) *)
+  | I_XBEGIN of lbl
+  | I_XABORT of operand
+  | I_XEND
 
       
 open Constant
@@ -242,6 +246,9 @@ let rec do_pp_instruction m =
   | I_LFENCE  -> "LFENCE"
   | I_SFENCE  -> "SFENCE"
   | I_MFENCE  -> "MFENCE"
+  | I_XBEGIN(lbl) -> ppi_lbl "XBEGIN" lbl
+  | I_XABORT(op) -> ppi_op "XABORT" op
+  | I_XEND -> "XEND"
 
 	
 let pp_instruction m i =
@@ -311,6 +318,8 @@ let rec fold_regs (f_reg,f_sreg) =
   | I_MFENCE|I_SFENCE|I_LFENCE
   | I_MOVSD
     -> c
+  | I_XBEGIN _ | I_XEND -> c
+  | I_XABORT op -> fold_operand c op
 	
 
 let rec map_regs f_reg f_symb =
@@ -365,6 +374,8 @@ let rec map_regs f_reg f_symb =
   | I_MFENCE|I_SFENCE|I_LFENCE
   | I_MOVSD
     -> ins
+  | I_XBEGIN _ | I_XEND -> ins
+  | I_XABORT op -> I_XABORT (map_operand op)
 
 
 let rec fold_addrs f =
@@ -407,6 +418,8 @@ let rec fold_addrs f =
   | I_MFENCE|I_SFENCE|I_LFENCE
   | I_MOVSD
     -> c
+  | I_XBEGIN _ | I_XEND -> c
+  | I_XABORT op -> fold_operand c op
 	
 let rec map_addrs f =
 
@@ -454,6 +467,8 @@ let rec map_addrs f =
   | I_MFENCE|I_SFENCE|I_LFENCE
   | I_MOVSD
     -> ins
+  | I_XBEGIN _ | I_XEND -> ins
+  | I_XABORT op -> I_XABORT (map_operand op)
 
 
 let norm_ins ins = match ins with
@@ -484,6 +499,9 @@ let rec get_next = function
   | I_MFENCE -> [Label.Next]
   | I_JMP lbl-> [Label.To lbl]
   | I_JCC (_,lbl) -> [Label.Next; Label.To lbl]
+  | I_XBEGIN lbl -> [Label.Next; Label.To lbl]
+  | I_XABORT _ -> [Label.Next] (* fixme: should be jump to fallback path *)
+  | I_XEND -> [Label.Next] (* fixme: could also jump to fallback path *)
 
 include Pseudo.Make
     (struct
@@ -519,6 +537,7 @@ include Pseudo.Make
         | I_SETNB e
             -> get_naccs_eff e
         | I_MOVSD -> 2
+        | I_XBEGIN _ | I_XABORT _ | I_XEND -> 0
 
       let rec fold_labels k f = function
         | I_LOCK ins -> fold_labels k f ins
@@ -532,6 +551,8 @@ include Pseudo.Make
         | I_MFENCE|I_SFENCE|I_LFENCE
         | I_CMPXCHG (_,_)
           -> k
+        | I_XBEGIN lbl -> f k lbl
+        | I_XABORT _ | I_XEND -> k
 
       let rec map_labels f ins = match ins with
         | I_LOCK ins -> I_LOCK (map_labels f ins)
@@ -544,6 +565,8 @@ include Pseudo.Make
         | I_MFENCE|I_SFENCE|I_LFENCE
         | I_CMPXCHG (_,_)
             -> ins
+        | I_XBEGIN lbl -> I_XBEGIN (f lbl)
+        | I_XABORT _ | I_XEND -> ins
 
     end)
 

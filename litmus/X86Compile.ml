@@ -67,6 +67,7 @@ module Make(V:Constant.S)(O:Arch.Config) =
     | I_JCC _
     | I_MFENCE|I_SFENCE|I_LFENCE
     | I_MOVSD
+    | I_XBEGIN _ | I_XABORT _ | I_XEND
       -> StringSet.empty
 
     let stable_regs _ins = A.RegSet.empty
@@ -247,6 +248,16 @@ module Make(V:Constant.S)(O:Arch.Config) =
     | I_SFENCE -> op_none "sfence"
     | I_LFENCE -> op_none "lfence"
     | I_MOVSD ->  op_none "movsd"
+    | I_XBEGIN lbl ->
+      { empty_ins with
+        memo = sprintf "xbegin %s" (A.Out.dump_label (tr_lab lbl));
+        label=None; branch=[Next] }
+    | I_XABORT op ->
+      let op,(_,_) = compile_op 0 op in
+      { empty_ins with
+        memo = sprintf "xabort %s" op;
+        label=None; branch=[(*todo: should be fallback*)] }
+    | I_XEND -> op_none "xend"
 
     let debug_regs chan rs =
       fprintf chan "%s"
